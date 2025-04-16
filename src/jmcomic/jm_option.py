@@ -1,5 +1,5 @@
 from .jm_client_impl import *
-
+import time
 
 class CacheRegistry:
     REGISTRY = {}
@@ -55,7 +55,6 @@ class CacheRegistry:
 
         cache: Callable
         client.set_cache_dict(cache(option, client))
-
 
 class DirRule:
     rule_sample = [
@@ -121,7 +120,6 @@ class DirRule:
         """
         解析下载路径dsl，得到一个路径规则解析列表
         """
-
         rule_list = self.split_rule_dsl(rule_dsl)
         solver_ls: List[DirRule.RuleSolver] = []
 
@@ -173,7 +171,6 @@ class DirRule:
         :param rule_solver: Ptitle
         :returns: photo.title
         """
-
         def choose_detail(key):
             if key == 'Bd':
                 return None
@@ -189,7 +186,6 @@ class DirRule:
     @classmethod
     def apply_rule_directly(cls, album, photo, rule: str) -> str:
         return cls.apply_rule_solver(album, photo, cls.get_rule_solver(rule))
-
 
 class JmOption:
 
@@ -278,7 +274,14 @@ class JmOption:
         # 以此决定保存文件夹、后缀、不包含后缀的文件名
         save_dir = self.decide_image_save_dir(image.from_photo)
         suffix = self.decide_image_suffix(image) if consider_custom_suffix else image.img_file_suffix
-        return os.path.join(save_dir, fix_windir_name(self.decide_image_filename(image)) + suffix)
+        filepath = os.path.join(save_dir, fix_windir_name(self.decide_image_filename(image)) + suffix)
+        
+        # Add buffer time for GIF downloads
+        if image.is_gif:
+            print(f"Preparing to download GIF {image.filename_without_suffix}. Adding 3-second buffer...")
+            time.sleep(3)  # Add 3-second delay for GIFs
+        
+        return filepath
 
     def decide_download_cache(self, _image: JmImageDetail) -> bool:
         return self.download.cache
@@ -393,13 +396,9 @@ class JmOption:
 
         # 所有需要用到的 self.client 配置项如下
         postman_conf: dict = deepcopy(self.client.postman.src_dict)  # postman dsl 配置
-
         meta_data: dict = postman_conf['meta_data']  # 元数据
-
         retry_times: int = self.client.retry_times  # 重试次数
-
         cache: str = cache if cache is not None else self.client.cache  # 启用缓存
-
         impl: str = impl or self.client.impl  # client_key
 
         if isinstance(impl, type):
@@ -408,26 +407,20 @@ class JmOption:
             impl = impl.client_key
 
         # start construct client
-
         # domain
         def decide_domain_list():
             nonlocal domain_list
-
             if domain_list is None:
                 domain_list = self.client.domain
-
             if not isinstance(domain_list, (list, str)):
                 # dict
                 domain_list = domain_list.get(impl, [])
-
             if isinstance(domain_list, str):
                 # multi-lines text
                 domain_list = str_to_list(domain_list)
-
             # list or str
             if len(domain_list) == 0:
                 domain_list = self.decide_client_domain(impl)
-
             return domain_list
 
         # support kwargs overwrite meta_data
